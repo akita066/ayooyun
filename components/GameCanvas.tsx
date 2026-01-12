@@ -10,7 +10,9 @@ import {
   Particle,
   Obstacle,
   DebugState,
-  SlimeArea
+  SlimeArea,
+  FloatingText,
+  GameNotification
 } from '../types';
 import { 
   CANVAS_WIDTH, 
@@ -44,7 +46,7 @@ interface GameCanvasProps {
   settings: GameSettings;
   gameState: GameState;
   setGameState: (state: GameState) => void;
-  onUpdateStats: (player: Player | undefined, alive: number, total: number, time: number, fps: number, spectatingName: string | null) => void;
+  onUpdateStats: (player: Player | undefined, alive: number, total: number, time: number, fps: number, spectatingName: string | null, allPlayers: Player[]) => void;
   debugState: DebugState;
 }
 
@@ -71,6 +73,11 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
   const particlesRef = useRef<Particle[]>([]);
   const obstaclesRef = useRef<Obstacle[]>([]);
   const slimeAreasRef = useRef<SlimeArea[]>([]);
+  
+  // Game Juice Refs
+  const floatingTextsRef = useRef<FloatingText[]>([]);
+  const notificationsRef = useRef<GameNotification[]>([]);
+  const screenShakeRef = useRef<number>(0);
   
   // Game Mechanic Refs
   const potatoSpeedMultiplierRef = useRef<number>(1.0); 
@@ -114,6 +121,35 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
     if (currentIndex === -1) currentIndex = 0;
     let nextIndex = (currentIndex + dir + targets.length) % targets.length;
     spectatingIdRef.current = targets[nextIndex];
+  };
+
+  const addFloatingText = (pos: Vector2, text: string, color: string, size: number = 20) => {
+      floatingTextsRef.current.push({
+          id: Math.random().toString(),
+          text,
+          x: pos.x,
+          y: pos.y - 30, // Start slightly above
+          color,
+          life: 1.0,
+          velocityY: -50, // Move up
+          size
+      });
+  };
+
+  const addNotification = (text: string, color: string = '#ffffff') => {
+      // Limit to 3 notifications stack
+      if (notificationsRef.current.length > 2) notificationsRef.current.shift();
+      notificationsRef.current.push({
+          id: Math.random().toString(),
+          text,
+          color,
+          spawnTime: Date.now(),
+          duration: 3000
+      });
+  };
+
+  const triggerScreenShake = (amount: number) => {
+      screenShakeRef.current = amount;
   };
 
   useEffect(() => {
@@ -226,6 +262,8 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
     powerupsRef.current = [];
     particlesRef.current = [];
     slimeAreasRef.current = [];
+    floatingTextsRef.current = [];
+    notificationsRef.current = [];
     spectatingIdRef.current = null;
     potatoSpeedMultiplierRef.current = 1.0;
     startTimeRef.current = Date.now();
@@ -304,6 +342,7 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
 
     // Visuals always run
     updateParticles(dt);
+    updateFloatingText(dt);
     
     framesRef.current++;
     if (now - lastFpsTimeRef.current >= 1000) {
@@ -324,7 +363,7 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
         else spectatingName = playersRef.current.find(p => p.id === spectatingIdRef.current)?.name || 'Unknown';
     }
 
-    onUpdateStats(user, aliveCount, playersRef.current.length, timeRef.current, fpsRef.current, spectatingName);
+    onUpdateStats(user, aliveCount, playersRef.current.length, timeRef.current, fpsRef.current, spectatingName, playersRef.current);
     animationFrameRef.current = requestAnimationFrame(gameLoop);
   };
 
@@ -397,6 +436,8 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
         targetId: null, isFrozen: false, freezeEndTime: 0, trail: [], currentPath: [], pathUpdateTimer: 0
      });
      spawnParticles({x: CANVAS_WIDTH/2, y: CANVAS_HEIGHT/2}, 50, '#ff4500');
+     triggerScreenShake(10);
+     addNotification("Another Potato Spawned!", "#ff4500");
   };
 
   const movePlayerToward = (p: Player, tx: number, ty: number, dt: number) => {
@@ -406,6 +447,10 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
       // For Human Player ('user'): Fix Jitter by checking distance
       if (p.id === 'user') {
           const dist = Math.sqrt(dx*dx + dy*dy);
+          
+          // Deadzone to prevent jitter when mouse is very close
+          if (dist < 5) return;
+
           const moveStep = p.speed * dt;
 
           if (dist < moveStep) {
@@ -486,6 +531,7 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
              p.speedBoostEndTime = now + ABILITY_DURATIONS.DASH;
              p.speed = BASE_SPEED * 2.5;
              spawnParticles(p.position, 10, p.color);
+             // Bot Logic: add effect locally for juice
           }
         } else {
            tx = CANVAS_WIDTH/2 + Math.sin(now * 0.001 + parseFloat(p.id.split('-')[1])) * 500;
@@ -607,6 +653,7 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
                         potato.isFrozen = true;
                         potato.freezeEndTime = now + 1000; // Freeze for 1 second
                         spawnParticles(potato.position, 15, '#22D3EE'); // Cyan particles
+                        addFloatingText(p.position, "BLOCKED!", "#22D3EE", 25);
                     }
                 } 
                 else if (!potato.isFrozen) {
@@ -619,13 +666,17 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
                     // Reduce HP
                     p.lives--;
                     spawnParticles(p.position, 30, p.color);
-                    
+                    addFloatingText(p.position, "-1 HP", "#ff0000", 30);
+                    triggerScreenShake(8);
+
                     if (p.lives <= 0) {
                         p.isDead = true; 
                         spawnParticles(p.position, 50, '#ff0000'); 
+                        triggerScreenShake(15);
                         
                         // Increase Potato Speed by 10% on player elimination
                         potatoSpeedMultiplierRef.current += 0.1;
+                        if(p.id !== 'user') addNotification(`${p.name} Eliminated!`, "#ff0000");
 
                         if (p.id === 'user') setGameState(GameState.GAME_OVER);
                     } else {
@@ -645,7 +696,11 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
        playersRef.current.forEach(p => {
          if (p.isDead) return;
          if (Math.hypot(p.position.x - pu.position.x, p.position.y - pu.position.y) < p.radius + pu.radius) {
-           collected = true; applyPowerup(p, pu, now); p.score += 50;
+           collected = true; 
+           applyPowerup(p, pu, now); 
+           p.score += 50;
+           addFloatingText(p.position, "+50", "#ffff00");
+           if (p.id === 'user') addNotification(`Picked up ${pu.type}!`, POWERUP_COLORS[pu.type]);
          }
        });
        return !collected;
@@ -690,6 +745,14 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
     });
     particlesRef.current = particlesRef.current.filter(p => p.life > 0);
   };
+  
+  const updateFloatingText = (dt: number) => {
+      floatingTextsRef.current.forEach(ft => {
+          ft.y += ft.velocityY * dt;
+          ft.life -= dt * 0.8;
+      });
+      floatingTextsRef.current = floatingTextsRef.current.filter(ft => ft.life > 0);
+  };
 
   const spawnParticles = (pos: Vector2, count: number, color: string) => {
     for(let i=0; i<count; i++) {
@@ -726,15 +789,23 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
         if (user && !user.isDead) target = user.position;
     }
     
-    // Smooth Camera
+    // Smooth Camera & Screen Shake
     const viewWidth = ctx.canvas.width / currentScale;
     const viewHeight = ctx.canvas.height / currentScale;
     
     cameraRef.current.x += (target.x - cameraRef.current.x - viewWidth/2) * 0.1;
     cameraRef.current.y += (target.y - cameraRef.current.y - viewHeight/2) * 0.1;
 
+    let shakeX = 0;
+    let shakeY = 0;
+    if (screenShakeRef.current > 0) {
+        shakeX = (Math.random() - 0.5) * screenShakeRef.current;
+        shakeY = (Math.random() - 0.5) * screenShakeRef.current;
+        screenShakeRef.current = Math.max(0, screenShakeRef.current - 0.5);
+    }
+
     ctx.save();
-    ctx.translate(-cameraRef.current.x, -cameraRef.current.y);
+    ctx.translate(-cameraRef.current.x + shakeX, -cameraRef.current.y + shakeY);
 
     // Grid
     ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2; ctx.beginPath();
@@ -850,11 +921,44 @@ const GameCanvas = forwardRef<GameEngineHandle, GameCanvasProps>(({
       ctx.restore();
     });
 
+    // Floating Texts
+    floatingTextsRef.current.forEach(ft => {
+        ctx.font = `bold ${ft.size}px Arial`;
+        ctx.fillStyle = ft.color;
+        ctx.globalAlpha = ft.life;
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.strokeText(ft.text, ft.x, ft.y);
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.globalAlpha = 1;
+    });
+
     particlesRef.current.forEach(p => {
       ctx.beginPath(); ctx.arc(p.position.x, p.position.y, p.size * p.life, 0, Math.PI*2); ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fill(); ctx.globalAlpha = 1;
     });
 
     ctx.restore();
+
+    // Draw UI Notifications (Top Center, fixed screen position)
+    const activeNotifications = notificationsRef.current.filter(n => Date.now() < n.spawnTime + n.duration);
+    notificationsRef.current = activeNotifications;
+    
+    // Scale UI Context back to 1:1 for crisp text
+    ctx.setTransform(1, 0, 0, 1, 0, 0); 
+    let notifY = 100;
+    activeNotifications.forEach(n => {
+        ctx.font = 'bold 20px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = n.color;
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = 'black'; ctx.shadowBlur = 4;
+        ctx.strokeText(n.text, ctx.canvas.width / 2, notifY);
+        ctx.fillText(n.text, ctx.canvas.width / 2, notifY);
+        ctx.shadowBlur = 0;
+        notifY += 30;
+    });
   };
 
   useEffect(() => {

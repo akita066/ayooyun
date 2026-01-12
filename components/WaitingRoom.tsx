@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { GameSettings, Player } from '../types';
 import { socketService } from '../socket';
 import { Play, Copy, Crown, MessageSquare, Send, ArrowLeft, Monitor, Wifi, SignalHigh, SignalMedium, SignalLow, Lock, Unlock } from 'lucide-react';
+import { playUiClick } from '../constants';
 
 interface WaitingRoomProps {
     settings: GameSettings;
@@ -36,16 +37,24 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({ settings, onStartGame, onLeav
     }, [onStartGame]);
 
     const handleCopyCode = () => {
+        playUiClick();
         navigator.clipboard.writeText(settings.roomId);
     };
 
     const handleStart = () => {
+        playUiClick();
         socketService.getSocket()?.emit('start_game');
+    };
+
+    const handleLeave = () => {
+        playUiClick();
+        onLeave();
     };
 
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
         if(!chatInput.trim()) return;
+        playUiClick();
         setMessages(prev => [...prev, { sender: settings.playerName, text: chatInput, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) }]);
         setChatInput('');
     };
@@ -63,7 +72,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({ settings, onStartGame, onLeav
             {/* Minimal Haxball-style Header */}
             <div className="h-12 bg-[#2d3748] border-b border-gray-700 flex items-center justify-between px-4 shadow-sm select-none">
                 <div className="flex items-center gap-3">
-                    <button onClick={onLeave} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10">
+                    <button onClick={handleLeave} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10">
                         <ArrowLeft size={18} />
                     </button>
                     <div className="text-white font-bold flex items-center gap-2">

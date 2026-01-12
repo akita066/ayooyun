@@ -246,7 +246,11 @@ class GameRoom {
         let nextX = p.position.x;
         let nextY = p.position.y;
 
-        if (dist < moveStep) {
+        // Fix jitter by adding deadzone
+        if (dist < 5) {
+             nextX = p.position.x;
+             nextY = p.position.y;
+        } else if (dist < moveStep) {
             nextX = p.position.x + dx;
             nextY = p.position.y + dy;
         } else {

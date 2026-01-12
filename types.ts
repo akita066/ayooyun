@@ -90,6 +90,25 @@ export interface Particle {
   size: number;
 }
 
+export interface FloatingText {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  color: string;
+  life: number;     // 1.0 to 0.0
+  velocityY: number; // Floating speed
+  size: number;
+}
+
+export interface GameNotification {
+  id: string;
+  text: string;
+  color: string;
+  spawnTime: number;
+  duration: number;
+}
+
 export interface Obstacle {
   id: string;
   x: number;
@@ -126,4 +145,12 @@ export interface DebugState {
   infiniteAbilities: boolean;
   timeScale: number;
   potatoSpeedModifier: number; // New: Manual speed adjustment
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  name: string;
+  score: number;
+  isDead: boolean;
+  isBot: boolean;
 }

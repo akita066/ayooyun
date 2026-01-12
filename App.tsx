@@ -5,7 +5,7 @@ import GameCanvas, { GameEngineHandle } from './components/GameCanvas';
 import HUD from './components/HUD';
 import Radio from './components/Radio';
 import AdminPanel from './components/AdminPanel';
-import { GameState, GameSettings, Player, DebugState } from './types';
+import { GameState, GameSettings, Player, DebugState, LeaderboardEntry } from './types';
 import { socketService } from './socket';
 
 const App: React.FC = () => {
@@ -42,6 +42,8 @@ const App: React.FC = () => {
     fps: 0,
     ping: 0
   });
+  
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   // Spectator State
   const [spectatingTargetName, setSpectatingTargetName] = useState<string | null>(null);
@@ -117,7 +119,8 @@ const App: React.FC = () => {
     total: number, 
     time: number, 
     fps: number, 
-    spectatingName: string | null
+    spectatingName: string | null,
+    allPlayers: Player[]
   ) => {
     frameCounter.current++;
     if (frameCounter.current % 6 !== 0) return;
@@ -131,6 +134,17 @@ const App: React.FC = () => {
       fps: fps,
     }));
     setSpectatingTargetName(spectatingName);
+
+    // Update Leaderboard
+    const sorted = [...allPlayers].sort((a, b) => b.score - a.score).slice(0, 5).map(p => ({
+        id: p.id,
+        name: p.name,
+        score: p.score,
+        isDead: p.isDead,
+        isBot: p.isBot
+    }));
+    setLeaderboard(sorted);
+
   }, []);
 
   // Spectator Actions
@@ -191,6 +205,7 @@ const App: React.FC = () => {
           onEnterSpectatorMode={handleEnterSpectatorMode}
           onReturnToLobby={handleReturnToLobby}
           onRestart={handleRestart}
+          leaderboard={leaderboard}
         />
       )}
 

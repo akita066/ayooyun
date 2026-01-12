@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GameSettings, ChatMessage } from '../types';
 import { Radio, Users, Cpu, Play, Send, MessageSquare, Copy, ArrowRight, Globe, Monitor, RefreshCw, Gauge, Lock, Unlock, Settings2 } from 'lucide-react';
 import { socketService } from '../socket';
-import { COLORS } from '../constants';
+import { COLORS, playUiClick } from '../constants';
 
 interface LobbyProps {
   onJoin: (settings: GameSettings) => void;
@@ -71,6 +71,7 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    playUiClick();
     if (name.trim().length === 0) return;
 
     if (gameMode === 'SINGLE') {
@@ -102,6 +103,7 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
+    playUiClick();
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       sender: name || 'Guest',
@@ -116,6 +118,21 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const setGameModeWithSound = (mode: 'SINGLE' | 'MULTI') => {
+      playUiClick();
+      setGameMode(mode);
+  };
+
+  const setMultiModeWithSound = (mode: 'HOST' | 'JOIN') => {
+      playUiClick();
+      setMultiMode(mode);
+  };
+
+  const togglePrivateWithSound = () => {
+      playUiClick();
+      setIsPrivate(!isPrivate);
+  };
 
   return (
     <div className="absolute inset-0 flex items-center justify-center z-40 overflow-hidden">
@@ -144,13 +161,13 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
           {/* Top Tabs: Single vs Multi */}
           <div className="flex p-1 bg-slate-900/50 rounded-xl mb-6 shrink-0">
             <button 
-              onClick={() => setGameMode('SINGLE')}
+              onClick={() => setGameModeWithSound('SINGLE')}
               className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${gameMode === 'SINGLE' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
               <Monitor size={16} /> SINGLE PLAYER
             </button>
             <button 
-              onClick={() => setGameMode('MULTI')}
+              onClick={() => setGameModeWithSound('MULTI')}
               className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${gameMode === 'MULTI' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
               <Globe size={16} /> ONLINE MULTIPLAYER
@@ -173,8 +190,8 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
 
             {gameMode === 'MULTI' && (
                <div className="flex p-1 bg-slate-900/30 rounded-lg shrink-0">
-                  <button type="button" onClick={() => setMultiMode('HOST')} className={`flex-1 py-2 text-xs font-bold rounded ${multiMode === 'HOST' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>HOST</button>
-                  <button type="button" onClick={() => setMultiMode('JOIN')} className={`flex-1 py-2 text-xs font-bold rounded ${multiMode === 'JOIN' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>JOIN</button>
+                  <button type="button" onClick={() => setMultiModeWithSound('HOST')} className={`flex-1 py-2 text-xs font-bold rounded ${multiMode === 'HOST' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>HOST</button>
+                  <button type="button" onClick={() => setMultiModeWithSound('JOIN')} className={`flex-1 py-2 text-xs font-bold rounded ${multiMode === 'JOIN' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>JOIN</button>
                </div>
             )}
 
@@ -219,7 +236,7 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
                        </div>
 
                        {/* Visibility Toggle */}
-                       <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => setIsPrivate(!isPrivate)}>
+                       <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors" onClick={togglePrivateWithSound}>
                           <div className="flex items-center gap-3">
                              {isPrivate ? <Lock size={18} className="text-red-400" /> : <Unlock size={18} className="text-green-400" />}
                              <div className="flex flex-col">
@@ -264,7 +281,7 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
                      ) : (
                         <div className="space-y-2">
                            {lobbies.map(l => (
-                              <div key={l.id} className="flex justify-between items-center bg-slate-800 p-2.5 rounded cursor-pointer hover:bg-slate-700 border border-transparent hover:border-indigo-500 transition-all group" onClick={() => { setMultiMode('JOIN'); setJoinRoomId(l.id); }}>
+                              <div key={l.id} className="flex justify-between items-center bg-slate-800 p-2.5 rounded cursor-pointer hover:bg-slate-700 border border-transparent hover:border-indigo-500 transition-all group" onClick={() => { playUiClick(); setMultiMode('JOIN'); setJoinRoomId(l.id); }}>
                                  <span className="font-mono text-orange-400 font-bold group-hover:text-orange-300">{l.id}</span>
                                  <div className="flex items-center gap-3">
                                     <span className="text-xs bg-slate-900 px-2 py-0.5 rounded text-slate-300">

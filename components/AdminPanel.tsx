@@ -1,6 +1,7 @@
 import React from 'react';
 import { DebugState } from '../types';
 import { Shield, Zap, Activity, Grid, Play, Pause, FastForward, Flame, Plus, Minus } from 'lucide-react';
+import { playUiClick } from '../constants';
 
 interface AdminPanelProps {
   debugState: DebugState;
@@ -12,12 +13,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ debugState, onUpdate, onClose }
   if (!debugState.isEnabled) return null;
 
   const toggle = (key: keyof DebugState) => {
+    playUiClick();
     // Cast to DebugState to allow boolean assignment to generic key (assuming caller only toggles booleans)
     onUpdate({ ...debugState, [key]: !debugState[key] } as DebugState);
   };
 
   const adjustPotatoSpeed = (delta: number) => {
+      playUiClick();
       onUpdate({ ...debugState, potatoSpeedModifier: Math.max(0, debugState.potatoSpeedModifier + delta) });
+  };
+
+  const adjustTimeScale = (scale: number) => {
+      playUiClick();
+      onUpdate({...debugState, timeScale: scale});
   };
 
   return (
@@ -93,9 +101,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ debugState, onUpdate, onClose }
         <div className="space-y-2 mt-4">
            <div className="text-xs text-slate-500 uppercase font-bold">Game Speed</div>
            <div className="flex bg-slate-800 rounded p-1">
-              <button onClick={() => onUpdate({...debugState, timeScale: 0.5})} className={`flex-1 flex justify-center py-1 rounded ${debugState.timeScale === 0.5 ? 'bg-slate-600' : ''}`}><Pause size={14}/></button>
-              <button onClick={() => onUpdate({...debugState, timeScale: 1.0})} className={`flex-1 flex justify-center py-1 rounded ${debugState.timeScale === 1.0 ? 'bg-slate-600' : ''}`}><Play size={14}/></button>
-              <button onClick={() => onUpdate({...debugState, timeScale: 2.0})} className={`flex-1 flex justify-center py-1 rounded ${debugState.timeScale === 2.0 ? 'bg-slate-600' : ''}`}><FastForward size={14}/></button>
+              <button onClick={() => adjustTimeScale(0.5)} className={`flex-1 flex justify-center py-1 rounded ${debugState.timeScale === 0.5 ? 'bg-slate-600' : ''}`}><Pause size={14}/></button>
+              <button onClick={() => adjustTimeScale(1.0)} className={`flex-1 flex justify-center py-1 rounded ${debugState.timeScale === 1.0 ? 'bg-slate-600' : ''}`}><Play size={14}/></button>
+              <button onClick={() => adjustTimeScale(2.0)} className={`flex-1 flex justify-center py-1 rounded ${debugState.timeScale === 2.0 ? 'bg-slate-600' : ''}`}><FastForward size={14}/></button>
            </div>
         </div>
       </div>

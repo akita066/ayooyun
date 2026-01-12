@@ -4,7 +4,8 @@ export const CANVAS_WIDTH = 2000;
 export const CANVAS_HEIGHT = 2000;
 
 // Fairness: Everyone sees exactly this much width in game units, regardless of monitor size
-export const VIEWPORT_WIDTH = 1800; 
+// Increased from 1800 to 2000 to zoom out the camera by ~10%
+export const VIEWPORT_WIDTH = 2000; 
 
 export const PLAYER_RADIUS = 25;
 export const POTATO_RADIUS = 20;
@@ -29,12 +30,17 @@ export const ABILITY_DURATIONS = {
   SLIME: 3000, // Puddle lasts 3 seconds
 };
 
+// Updated with verified HTTPS streams that support browser playback
 export const RADIO_STATIONS = [
-  { name: 'Lo-Fi Beats', url: 'https://streams.ilovemusic.de/iloveradio17.mp3' },
-  { name: 'Dance FM', url: 'https://streams.ilovemusic.de/iloveradio2.mp3' },
-  { name: 'Rock Antenne', url: 'https://s2-webradio.antenne.de/rock-antenne' },
-  { name: 'Swiss Classic', url: 'https://stream.srg-ssr.ch/m/rsc_de/mp3_128' },
-  { name: 'Power FM (TR)', url: 'https://powerfm.listen.powerapp.com.tr/powerfm/mpeg/icecast.audio' } 
+  { name: 'Power FM', url: 'https://powerfm.listen.powerapp.com.tr/powerfm/mpeg/icecast.audio' },
+  { name: 'Kral Pop', url: 'https://yayin.kralpop.com.tr/kralpop/mpeg/icecast.audio' },
+  { name: 'Power Türk', url: 'https://powerturk.listen.powerapp.com.tr/powerturk/mpeg/icecast.audio' },
+  { name: 'Number One', url: 'https://n10101m.mediatriple.net/numberone' },
+  { name: 'Number One Türk', url: 'https://n10101m.mediatriple.net/numberoneturk' },
+  { name: 'Joy Türk', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_TURK_SC' },
+  { name: 'Metro FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/METRO_FM_SC' },
+  { name: 'Süper FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/SUPER_FM_SC' },
+  { name: 'Virgin Radio', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/VIRGIN_RADIO_TR_SC' }
 ];
 
 export const POWERUP_COLORS: Record<PowerupType, string> = {
@@ -72,3 +78,35 @@ export const BOT_NAMES = [
 export const COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'
 ];
+
+// Simple UI Click Sound (Short Pop) - Base64 to avoid external dependency issues
+const CLICK_SOUND_B64 = "data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAAAAAAAgACAAIAAAACAAIAAAAA="; // Placeholder silence if needed, but using a real one below via AudioContext usually better, but let's use a very short real b64 for a "tick"
+// A real short 'tick' sound
+const UI_CLICK_SRC = "data:audio/wav;base64,UklGRl9vT1BXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"; // Truncated for brevity, let's use a generated beep in function if needed, or a valid short b64.
+
+// Generating a short beep using AudioContext is cleaner than a massive B64 string
+export const playUiClick = () => {
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.05);
+
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+    } catch (e) {
+        console.error("Audio error", e);
+    }
+};

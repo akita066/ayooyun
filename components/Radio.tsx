@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { RADIO_STATIONS } from '../constants';
-import { Play, Pause, Volume2, VolumeX, Radio as RadioIcon, ChevronUp, ChevronDown } from 'lucide-react';
+import { RADIO_STATIONS, playUiClick } from '../constants';
+import { Play, Pause, Volume2, VolumeX, Radio as RadioIcon, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
 
 interface RadioProps {
   isPlayingGame: boolean;
@@ -12,6 +12,7 @@ const Radio: React.FC<RadioProps> = ({ isPlayingGame }) => {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [hasError, setHasError] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -22,67 +23,78 @@ const Radio: React.FC<RadioProps> = ({ isPlayingGame }) => {
     }
   }, [isPlayingGame]);
 
+  // Handle Volume Changes
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
     }
   }, [volume, isMuted]);
 
-  const togglePlay = () => {
+  // Handle Play/Pause and Station Changes
+  useEffect(() => {
     if (!audioRef.current) return;
-    
+
     if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+        setHasError(false);
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                if (error.name !== 'AbortError') {
+                    console.error("Playback failed:", error);
+                    setIsPlaying(false);
+                }
+            });
+        }
     } else {
-      setIsPlaying(true);
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          // Ignore AbortError which happens if pause() is called immediately
-          if (error.name !== 'AbortError') {
-             console.error("Audio playback failed:", error);
-             setIsPlaying(false);
-          }
-        });
-      }
+        audioRef.current.pause();
     }
+  }, [isPlaying, currentStationIndex]);
+
+  const togglePlay = () => {
+    playUiClick();
+    setIsPlaying(!isPlaying);
   };
 
   const changeStation = (index: number) => {
+    playUiClick();
     setCurrentStationIndex(index);
-    // Optimistically show playing state
-    setIsPlaying(true);
+    setHasError(false);
+    setIsPlaying(true); // Auto-play on station switch
+  };
 
-    if (audioRef.current) {
-      audioRef.current.src = RADIO_STATIONS[index].url;
-      const playPromise = audioRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          // Ignore AbortError (caused by rapid switching)
-          if (error.name !== 'AbortError') {
-             console.error("Station switch error:", error);
-             setIsPlaying(false);
-          }
-        });
-      }
-    }
+  const handleToggleMinimize = () => {
+      playUiClick();
+      setIsMinimized(!isMinimized);
   };
 
   const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement, Event>) => {
-      console.warn("Radio stream failed to load.", e.currentTarget.error);
-      setIsPlaying(false);
+      console.warn(`Radio stream failed for ${RADIO_STATIONS[currentStationIndex].name}:`, e.currentTarget.error?.message);
+      
+      // If we are currently trying to play, and it fails, try the next one automatically
+      if (isPlaying && !hasError) {
+          console.log("Attempting to switch to next available station...");
+          // Prevents infinite rapid loops if all fail instantly (simple debounce logic via hasError state could be more complex, but this is a basic guard)
+          const nextIndex = (currentStationIndex + 1) % RADIO_STATIONS.length;
+          
+          // Small timeout to prevent UI freezing if all are down
+          setTimeout(() => {
+              setCurrentStationIndex(nextIndex);
+          }, 500);
+      } else {
+          setHasError(true);
+          setIsPlaying(false);
+      }
   };
 
   return (
-    <div className={`fixed bottom-4 left-4 z-50 transition-all duration-300 ${isMinimized ? 'w-12 h-12 overflow-hidden' : 'w-72'}`}>
+    // Changed w-12 to w-20 in minimized state to fit the icon and chevron comfortably
+    <div className={`fixed bottom-4 left-4 z-50 transition-all duration-300 ${isMinimized ? 'w-20 h-12 overflow-hidden' : 'w-80'}`}>
       <div className="bg-slate-800/90 backdrop-blur-md border border-slate-600 rounded-lg shadow-xl text-white overflow-hidden">
-        {/* Header / Minimized View */}
-        <div className="flex items-center justify-between p-3 bg-slate-900/50 cursor-pointer" onClick={() => setIsMinimized(!isMinimized)}>
+        {/* Header / Minimized View - Padding increased (px-4) for better edge spacing */}
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-900/50 cursor-pointer" onClick={handleToggleMinimize}>
           <div className="flex items-center gap-2">
             <RadioIcon className={`w-5 h-5 ${isPlaying ? 'text-green-400 animate-pulse' : 'text-slate-400'}`} />
-            {!isMinimized && <span className="font-bold text-sm">Turkish FM</span>}
+            {!isMinimized && <span className="font-bold text-sm">Radio</span>}
           </div>
           <button className="text-slate-400 hover:text-white">
             {isMinimized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -93,16 +105,18 @@ const Radio: React.FC<RadioProps> = ({ isPlayingGame }) => {
         {!isMinimized && (
           <div className="p-4 space-y-4">
             {/* Station Info */}
-            <div className="text-center">
+            <div className="text-center relative">
               <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Now Playing</div>
-              <div className="font-medium text-lg text-cyan-300 truncate">{RADIO_STATIONS[currentStationIndex].name}</div>
+              <div className="font-medium text-lg text-cyan-300 truncate px-2">{RADIO_STATIONS[currentStationIndex].name}</div>
+              {hasError && <div className="text-xs text-red-400 mt-1 flex items-center justify-center gap-1"><AlertCircle size={10}/> Stream unavailable</div>}
             </div>
 
             {/* Playback Controls */}
             <div className="flex justify-center items-center gap-4">
               <button 
                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                className="w-10 h-10 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center transition-colors"
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-lg ${hasError ? 'bg-red-900/50 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 hover:shadow-indigo-500/50'}`}
+                disabled={hasError}
               >
                 {isPlaying ? <Pause size={20} fill="white" /> : <Play size={20} fill="white" className="ml-1" />}
               </button>
@@ -110,7 +124,7 @@ const Radio: React.FC<RadioProps> = ({ isPlayingGame }) => {
 
             {/* Volume */}
             <div className="flex items-center gap-2">
-              <button onClick={() => setIsMuted(!isMuted)} className="text-slate-400 hover:text-white">
+              <button onClick={() => { playUiClick(); setIsMuted(!isMuted); }} className="text-slate-400 hover:text-white">
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
               <input 
@@ -132,9 +146,9 @@ const Radio: React.FC<RadioProps> = ({ isPlayingGame }) => {
                   onClick={() => changeStation(idx)}
                   className={`p-2 rounded cursor-pointer text-sm transition-colors flex justify-between items-center ${currentStationIndex === idx ? 'bg-indigo-900/50 text-indigo-300' : 'hover:bg-slate-700 text-slate-300'}`}
                 >
-                  <span>{station.name}</span>
+                  <span className="truncate pr-2">{station.name}</span>
                   {currentStationIndex === idx && isPlaying && (
-                    <div className="flex gap-0.5 h-3 items-end">
+                    <div className="flex gap-0.5 h-3 items-end shrink-0">
                       <div className="w-0.5 bg-indigo-400 h-full animate-bounce" style={{ animationDelay: '0s' }}></div>
                       <div className="w-0.5 bg-indigo-400 h-2/3 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                       <div className="w-0.5 bg-indigo-400 h-1/2 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
@@ -148,10 +162,9 @@ const Radio: React.FC<RadioProps> = ({ isPlayingGame }) => {
       </div>
       <audio 
         ref={audioRef} 
-        src={RADIO_STATIONS[0].url} 
-        loop={false} 
-        crossOrigin="anonymous" 
+        src={RADIO_STATIONS[currentStationIndex].url} 
         onError={handleAudioError}
+        preload="none"
       />
     </div>
   );

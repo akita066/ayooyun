@@ -1,7 +1,7 @@
 import React from 'react';
-import { Player, PowerupType, GameState } from '../types';
-import { ABILITY_COOLDOWNS } from '../constants';
-import { Clock, Shield, Wind, User, Zap, Activity, Eye, ChevronLeft, ChevronRight, Flame, Heart, Droplets } from 'lucide-react';
+import { Player, PowerupType, GameState, LeaderboardEntry } from '../types';
+import { ABILITY_COOLDOWNS, playUiClick } from '../constants';
+import { Clock, Shield, Wind, User, Zap, Activity, Eye, ChevronLeft, ChevronRight, Flame, Heart, Droplets, Trophy, Skull, Crown } from 'lucide-react';
 
 interface HUDProps {
   player: Player | undefined;
@@ -18,6 +18,7 @@ interface HUDProps {
   onEnterSpectatorMode: () => void;
   onReturnToLobby: () => void;
   onRestart: () => void;
+  leaderboard: LeaderboardEntry[];
 }
 
 const HUD: React.FC<HUDProps> = ({ 
@@ -34,7 +35,8 @@ const HUD: React.FC<HUDProps> = ({
   onSpectatePotato,
   onEnterSpectatorMode,
   onReturnToLobby,
-  onRestart
+  onRestart,
+  leaderboard
 }) => {
   if (gameState === GameState.LOBBY || gameState === GameState.WAITING) return null;
 
@@ -48,6 +50,11 @@ const HUD: React.FC<HUDProps> = ({
   const getCooldownProgress = (current: number, max: number) => {
     if (current <= 0) return 0;
     return Math.min((current / max) * 100, 100);
+  };
+
+  const handleAction = (action: () => void) => {
+      playUiClick();
+      action();
   };
 
   // Circular Ability Button Component
@@ -199,7 +206,7 @@ const HUD: React.FC<HUDProps> = ({
         {/* Spectator Leave Button */}
         {isSpectating ? (
           <button 
-            onClick={onReturnToLobby}
+            onClick={() => handleAction(onReturnToLobby)}
             className="bg-slate-900/80 hover:bg-slate-800 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors pointer-events-auto"
           >
             LEAVE
@@ -216,26 +223,34 @@ const HUD: React.FC<HUDProps> = ({
                <h2 className="text-6xl font-black text-red-500 mb-2 drop-shadow-lg">ELIMINATED</h2>
                <p className="text-slate-300 text-xl mb-6">The Hot Potato caught you!</p>
                
-               <div className="bg-slate-800 rounded-xl p-4 mb-6 grid grid-cols-2 gap-4 text-left">
-                  <div>
-                    <div className="text-xs text-slate-500">Survival Time</div>
-                    <div className="text-lg font-mono text-white">{formatTime(gameTime)}</div>
+               {/* Leaderboard Table */}
+               <div className="bg-slate-800/50 rounded-xl p-4 mb-6 border border-slate-700">
+                  <div className="text-xs text-slate-400 uppercase font-bold mb-3 flex items-center gap-2 justify-center">
+                     <Trophy size={14} className="text-yellow-500" /> Top Survivors
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500">Final Score</div>
-                    <div className="text-lg font-mono text-cyan-400">{Math.floor(player?.score || 0)}</div>
+                  <div className="space-y-2">
+                     {leaderboard.map((entry, idx) => (
+                        <div key={entry.id} className={`flex justify-between items-center text-sm p-2 rounded ${entry.id === player?.id ? 'bg-indigo-900/40 border border-indigo-500/30' : 'bg-slate-900/30'}`}>
+                           <div className="flex items-center gap-3">
+                              <span className={`font-mono font-bold w-4 ${idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-orange-400' : 'text-slate-500'}`}>#{idx + 1}</span>
+                              <span className={`${entry.isDead ? 'text-red-400 line-through' : 'text-white font-bold'}`}>{entry.name}</span>
+                              {entry.isDead && <Skull size={12} className="text-red-500" />}
+                           </div>
+                           <span className="font-mono text-cyan-400">{Math.floor(entry.score)}</span>
+                        </div>
+                     ))}
                   </div>
                </div>
 
                <div className="flex gap-4 justify-center">
                  <button 
-                   onClick={onReturnToLobby}
+                   onClick={() => handleAction(onReturnToLobby)}
                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-transform hover:scale-105"
                  >
                    RETURN TO LOBBY
                  </button>
                  <button 
-                   onClick={onEnterSpectatorMode}
+                   onClick={() => handleAction(onEnterSpectatorMode)}
                    className="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform hover:scale-105 flex items-center gap-2"
                  >
                    <Eye size={20} />
@@ -246,28 +261,38 @@ const HUD: React.FC<HUDProps> = ({
          )}
          
          {gameState === GameState.PLAYING && player && player.score > 0 && playersAlive === 1 && !player.isDead && (
-             <div className="text-center pointer-events-auto bg-slate-900/90 p-8 rounded-3xl border border-yellow-500/50 shadow-2xl backdrop-blur animate-bounce-in">
+             <div className="text-center pointer-events-auto bg-slate-900/90 p-8 rounded-3xl border border-yellow-500/50 shadow-2xl backdrop-blur animate-bounce-in max-w-lg w-full">
                <h2 className="text-6xl font-black text-yellow-500 mb-2 drop-shadow-lg">VICTORY!</h2>
                <p className="text-slate-300 text-xl mb-6">You are the last one standing!</p>
-               <div className="bg-slate-800 rounded-xl p-4 mb-6 grid grid-cols-2 gap-4 text-left">
-                  <div>
-                    <div className="text-xs text-slate-500">Total Time</div>
-                    <div className="text-lg font-mono text-white">{formatTime(gameTime)}</div>
+               
+               {/* Leaderboard Table */}
+               <div className="bg-slate-800/50 rounded-xl p-4 mb-6 border border-slate-700">
+                  <div className="text-xs text-slate-400 uppercase font-bold mb-3 flex items-center gap-2 justify-center">
+                     <Trophy size={14} className="text-yellow-500" /> Final Standings
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500">Score</div>
-                    <div className="text-lg font-mono text-yellow-400">{Math.floor(player.score + 500)}</div>
+                  <div className="space-y-2">
+                     {leaderboard.map((entry, idx) => (
+                        <div key={entry.id} className={`flex justify-between items-center text-sm p-2 rounded ${entry.id === player?.id ? 'bg-indigo-900/40 border border-indigo-500/30' : 'bg-slate-900/30'}`}>
+                           <div className="flex items-center gap-3">
+                              <span className={`font-mono font-bold w-4 ${idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-orange-400' : 'text-slate-500'}`}>#{idx + 1}</span>
+                              <span className={`${entry.isDead ? 'text-red-400' : 'text-white font-bold'}`}>{entry.name}</span>
+                              {!entry.isDead && <Crown size={12} className="text-yellow-400" />}
+                           </div>
+                           <span className="font-mono text-cyan-400">{Math.floor(entry.score)}</span>
+                        </div>
+                     ))}
                   </div>
                </div>
+
                <div className="flex gap-4 justify-center">
                    <button 
-                     onClick={onReturnToLobby}
+                     onClick={() => handleAction(onReturnToLobby)}
                      className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-transform hover:scale-105"
                    >
                      LOBBY
                    </button>
                    <button 
-                     onClick={onRestart}
+                     onClick={() => handleAction(onRestart)}
                      className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform hover:scale-105"
                    >
                      PLAY AGAIN
@@ -288,7 +313,7 @@ const HUD: React.FC<HUDProps> = ({
       <div className="flex items-end justify-center pb-4 gap-8 pointer-events-auto">
          {isSpectating ? (
            <div className="bg-slate-900/80 backdrop-blur border border-slate-600 rounded-full p-2 flex items-center gap-4 shadow-xl mb-4">
-             <button onClick={onSpectatePrev} className="p-3 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white transition-colors">
+             <button onClick={() => handleAction(onSpectatePrev)} className="p-3 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white transition-colors">
                <ChevronLeft size={24} />
              </button>
              
@@ -302,7 +327,7 @@ const HUD: React.FC<HUDProps> = ({
              </div>
 
              <button 
-               onClick={onSpectatePotato}
+               onClick={() => handleAction(onSpectatePotato)}
                className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-full font-bold text-sm transition-transform hover:scale-105"
                title="Watch Potato"
              >
@@ -310,7 +335,7 @@ const HUD: React.FC<HUDProps> = ({
                POTATO
              </button>
 
-             <button onClick={onSpectateNext} className="p-3 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white transition-colors">
+             <button onClick={() => handleAction(onSpectateNext)} className="p-3 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white transition-colors">
                <ChevronRight size={24} />
              </button>
            </div>
